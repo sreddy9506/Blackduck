@@ -1,0 +1,115 @@
+version: '2'
+services:
+  webapp:
+    mem_limit: 9481224192
+    image: blackducksoftware/hub-webapp:4.2.1
+    environment:
+      HUB_MAX_MEMORY: 9600m
+      HUB_PROXY_NON_PROXY_HOSTS: solr
+      HUB_VERSION: 4.2.1
+    volumes:
+    - log-volume:/opt/blackduck/hub/logs
+    - webapp-volume:/opt/blackduck/hub/hub-webapp/security
+    links:
+    - registration:registration
+    - postgres:postgres
+    - zookeeper:zookeeper
+    - cfssl:cfssl
+    - logstash:logstash
+    - solr:solr
+    user: tomcat:root
+  logstash:
+    mem_limit: 671088640
+    image: blackducksoftware/hub-logstash:4.2.1
+    volumes:
+    - log-volume:/var/lib/logstash/data
+    user: logstash:root
+  zookeeper:
+    mem_limit: 402653184
+    image: blackducksoftware/hub-zookeeper:4.2.1
+    links:
+    - logstash:logstash
+    user: zookeeper:root
+  custom-nginx:
+    image: containers.cisco.com/chrhogan/blackduck-nginx:latest
+    stdin_open: true
+    tty: true
+    links:
+    - documentation:documentation
+    - webapp:webapp
+    - cfssl:cfssl
+    labels:
+      io.rancher.container.pull_image: always
+  documentation:
+    mem_limit: 536870912
+    image: blackducksoftware/hub-documentation:4.2.1
+    links:
+    - logstash:logstash
+    user: tomcat:root
+  solr:
+    mem_limit: 1342177280
+    image: blackducksoftware/hub-solr:4.2.1
+    volumes:
+    - solr6-volume:/opt/blackduck/hub/solr/cores.data
+    links:
+    - zookeeper:zookeeper
+    - logstash:logstash
+    user: solr:root
+  cfssl:
+    mem_limit: 1073741824
+    image: blackducksoftware/hub-cfssl:4.2.1
+    volumes:
+    - cert-volume:/etc/cfssl
+    user: cfssl:root
+  registration:
+    mem_limit: 671088640
+    image: blackducksoftware/hub-registration:4.2.1
+    environment:
+      HUB_PROXY_NON_PROXY_HOSTS: solr
+      HUB_VERSION: 4.2.1
+    volumes:
+    - config-volume:/opt/blackduck/hub/registration/config
+    links:
+    - logstash:logstash
+    user: tomcat:root
+  jobrunner:
+    mem_limit: 9481224192
+    image: blackducksoftware/hub-jobrunner:4.2.1
+    environment:
+      HUB_MAX_MEMORY: 9600m
+      HUB_PROXY_NON_PROXY_HOSTS: solr
+      HUB_VERSION: 4.2.1
+    links:
+    - registration:registration
+    - postgres:postgres
+    - zookeeper:zookeeper
+    - cfssl:cfssl
+    - logstash:logstash
+    - solr:solr
+    user: jobrunner:root
+  webserver:
+    mem_limit: 1342177280
+    image: blackducksoftware/hub-nginx:4.2.1
+    environment:
+      HUB_WEBSERVER_PORT: '8080'
+      IPV4_ONLY: '0'
+      PUBLIC_HUB_WEBSERVER_HOST: 64.102.13.102
+      PUBLIC_HUB_WEBSERVER_PORT: '8888'
+    volumes:
+    - webserver-volume:/opt/blackduck/hub/webserver/security
+    links:
+    - documentation:documentation
+    - cfssl:cfssl
+    - webapp:webapp
+    user: nginx:root
+  postgres:
+    mem_limit: 6442450944
+    image: blackducksoftware/hub-postgres:4.2.1
+    volumes:
+    - postgres96-data-volume:/var/lib/postgresql/data
+    links:
+    - cfssl:cfssl
+    - logstash:logstash
+    ports:
+    - 55436:5432/tcp
+    user: postgres:root
